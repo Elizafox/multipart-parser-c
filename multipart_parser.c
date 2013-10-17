@@ -160,6 +160,15 @@ size_t multipart_parser_execute(multipart_parser* p, const char *buf, size_t len
           break;
         }
 
+        if (c == ' ' || c == '\t') {
+          p->state = s_header_value_start;
+          break;
+        }
+
+        if (c == '-') {
+          break;
+        }
+
         if (c == ':') {
           EMIT_DATA_CB(header_field, buf + mark, i - mark);
           p->state = s_header_value_start;
@@ -186,7 +195,7 @@ size_t multipart_parser_execute(multipart_parser* p, const char *buf, size_t len
 
       case s_header_value_start:
         multipart_log("s_header_value_start");
-        if (c == ' ') {
+        if (c == ' ' || c == '\t') {
           break;
         }
 
