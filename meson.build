@@ -1,4 +1,4 @@
-project('multipart-parser-c', 'c',
+project('multipart_parser_c', 'c',
   version : '0.1',
   default_options : ['warning_level=3'])
 
