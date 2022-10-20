@@ -20,6 +20,8 @@ static void multipart_log(const char * format, ...)
     fprintf(stderr, "\n");
     
     va_end(args);
+#else
+    (void)format;
 #endif
 }
 
