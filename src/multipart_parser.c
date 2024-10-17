@@ -73,7 +73,9 @@ enum state {
   s_header_value_almost_done,
   s_part_data_start,
   s_part_data,
-  s_part_data_almost_boundary,
+  s_part_data_almost_boundary_lf,
+  s_part_data_almost_boundary_first_dash,
+  s_part_data_almost_boundary_second_dash,
   s_part_data_boundary,
   s_part_data_almost_end,
   s_part_data_end,
@@ -241,27 +243,30 @@ size_t multipart_parser_execute(multipart_parser* p, const char *buf, size_t len
       /* fallthrough */
       case s_part_data:
         multipart_log("s_part_data");
-        if (c == CR && i >= len - p->boundary_length - 6) {
+        if (c == CR) {
             EMIT_DATA_CB(part_data, buf + mark, i - mark);
             mark = i;
-            p->state = s_part_data_almost_boundary;
+            p->state = s_part_data_almost_boundary_lf;
             p->lookbehind[0] = CR;
+            p->lookbehind[1] = LF;
+            p->lookbehind[2] = '-';
+            p->lookbehind[3] = '-';
             break;
         }
         if (is_last)
             EMIT_DATA_CB(part_data, buf + mark, (i - mark) + 1);
         break;
-
-      case s_part_data_almost_boundary:
+ 
+      case s_part_data_almost_boundary_lf:
+      case s_part_data_almost_boundary_first_dash:
+      case s_part_data_almost_boundary_second_dash:
         multipart_log("s_part_data_almost_boundary");
-        if (c == LF) {
-            p->state = s_part_data_boundary;
-            i += 2; // first '--'
-            p->lookbehind[1] = LF;
-            p->index = 0;
+        if (c == p->lookbehind[1 + p->state - s_part_data_almost_boundary_lf]) {
+            if(++p->state == s_part_data_boundary)
+              p->index = 0;
             break;
         }
-        EMIT_DATA_CB(part_data, p->lookbehind, 1);
+        EMIT_DATA_CB(part_data, p->lookbehind, 1 + p->state - s_part_data_almost_boundary_lf);
         p->state = s_part_data;
         mark = i --;
         break;
@@ -269,12 +274,12 @@ size_t multipart_parser_execute(multipart_parser* p, const char *buf, size_t len
       case s_part_data_boundary:
         multipart_log("s_part_data_boundary");
         if (p->multipart_boundary[p->index] != c) {
-          EMIT_DATA_CB(part_data, p->lookbehind, 2 + p->index);
+          EMIT_DATA_CB(part_data, p->lookbehind, 4 + p->index);
           p->state = s_part_data;
           mark = i --;
           break;
         }
-        p->lookbehind[2 + p->index] = c;
+        p->lookbehind[4 + p->index] = c;
         if ((++ p->index) == p->boundary_length) {
             NOTIFY_CB(part_data_end);
             p->state = s_part_data_almost_end;
